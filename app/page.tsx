@@ -4,6 +4,8 @@
 // 2. ReactのuseStateという機能をインポートします
 import { useState } from "react";
 import { AiResponseSchema, AiResponseType } from '@/lib/schemas';
+import { getErrorMessage } from '@/lib/errorUtils';
+
 
 export default function Home() {
   // 3. コンポーネントの「状態（State）」を定義します
@@ -14,7 +16,7 @@ export default function Home() {
   // ローディング状態を管理するための変数
   const [isLoading, setIsLoading] = useState(false);
   // エラーメッセージ用のStateを追加
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
 
   // 4. ボタンがクリックされたときに実行する関数
@@ -58,7 +60,7 @@ export default function Home() {
     } catch (err) {
       // エラーが発生した場合
       console.error(err);
-      setError(err.message || "予期せぬエラーが発生しました。");
+      setError(getErrorMessage(err) || "予期せぬエラーが発生しました。");
     } finally {
       // 成功・失敗に関わらずローディングを解除
       setIsLoading(false);
