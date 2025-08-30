@@ -3,6 +3,7 @@
 
 // 2. ReactのuseStateという機能をインポートします
 import { useState } from "react";
+import { AiResponseSchema } from '@/lib/schemas';
 
 export default function Home() {
   // 3. コンポーネントの「状態（State）」を定義します
@@ -12,29 +13,57 @@ export default function Home() {
   const [result, setResult] = useState(null);
   // ローディング状態を管理するための変数
   const [isLoading, setIsLoading] = useState(false);
+  // エラーメッセージ用のStateを追加
+  const [error, setError] = useState(null);
+
 
   // 4. ボタンがクリックされたときに実行する関数
   const handleSubmit = async () => {
     // ボタンをローディング状態にする
     setIsLoading(true);
     setResult(null); // 前回の結果をクリア
+    setError(null); // エラーをクリア
 
     // ここにAPIを呼び出す処理を後で書きます
     console.log("Submitting text:", text);
+    // --- API呼び出し処理 ---
+    try {
+      // .env.localからAPIエンドポイントを取得
+      const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_ENDPOINT;
+      if (!baseUrl) {
+        throw new Error("APIエンドポイントが設定されていません。");
+      }
 
-    // ダミーの待機時間（APIっぽさを出すため）
-    await new Promise(resolve => setTimeout(resolve, 1500));
+      // ベースURLとパスを結合して完全なURLを作成
+      const endpoint = `${baseUrl}/v1/detect`;
 
-    // ダミーのレスポンス
-    const dummyResponse = {
-      score: Math.random(), // 0から1のランダムな数値
-      is_ai: Math.random() > 0.5,
-    };
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: text }),
+      });
 
-    // 結果をStateに保存
-    setResult(dummyResponse);
-    // ローディング状態を解除
-    setIsLoading(false);
+      // APIからのレスポンスがエラーだった場合
+      if (!response.ok) {
+        throw new Error(`APIエラー: ${response.status} ${response.statusText}`);
+      }
+
+      // レスポンスのJSONをパース
+      const rawData = await response.json();
+      const validatedData = AiResponseSchema.parse(rawData);
+      setResult(validatedData);
+
+    } catch (err) {
+      // エラーが発生した場合
+      console.error(err);
+      setError(err.message || "予期せぬエラーが発生しました。");
+    } finally {
+      // 成功・失敗に関わらずローディングを解除
+      setIsLoading(false);
+    }
+    // --- ここまで ---
   };
 
   return (
@@ -61,6 +90,13 @@ export default function Home() {
             {isLoading ? "判定中..." : "判定する"}
           </button>
         </div>
+
+        {/* エラーメッセージ表示エリア */}
+        {error && (
+          <div className="mt-8 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
+            <p><strong>エラー:</strong> {error}</p>
+          </div>
+        )}
 
         {/* 6. 結果を表示するエリア */}
         {result && (
