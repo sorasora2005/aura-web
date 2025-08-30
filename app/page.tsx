@@ -3,14 +3,14 @@
 
 // 2. ReactのuseStateという機能をインポートします
 import { useState } from "react";
-import { AiResponseSchema } from '@/lib/schemas';
+import { AiResponseSchema, AiResponseType } from '@/lib/schemas';
 
 export default function Home() {
   // 3. コンポーネントの「状態（State）」を定義します
   // テキストエリアの入力内容を保存するための変数
   const [text, setText] = useState("");
   // APIからの結果を保存するための変数
-  const [result, setResult] = useState(null);
+  const [result, setResult] = useState<AiResponseType | null>(null);
   // ローディング状態を管理するための変数
   const [isLoading, setIsLoading] = useState(false);
   // エラーメッセージ用のStateを追加

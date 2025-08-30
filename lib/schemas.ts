@@ -6,4 +6,7 @@ export const AiResponseSchema = z.object({
   score: z.number(),
 });
 
+// ↑のスキーマからTypeScriptの型を生成してエクスポート
+export type AiResponseType = z.infer<typeof AiResponseSchema>;
+
 // 他のスキーマもここに追加できる
