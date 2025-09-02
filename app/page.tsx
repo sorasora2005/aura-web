@@ -1,124 +1,119 @@
-// 1. ファイルの先頭に必ずこれを書きます
 "use client";
 
-// 2. ReactのuseStateという機能をインポートします
-import { useState } from "react";
-import { AiResponseSchema, AiResponseType } from '@/lib/schemas';
-import { getErrorMessage } from '@/lib/errorUtils';
-
+import { useState, useEffect } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { Auth } from "@supabase/auth-ui-react";
+import { ThemeSupa } from "@supabase/auth-ui-shared";
+import type { Session } from "@supabase/supabase-js";
+import Detector from "@/components/Detector";
 
 export default function Home() {
-  // 3. コンポーネントの「状態（State）」を定義します
-  // テキストエリアの入力内容を保存するための変数
-  const [text, setText] = useState("");
-  // APIからの結果を保存するための変数
-  const [result, setResult] = useState<AiResponseType | null>(null);
-  // ローディング状態を管理するための変数
-  const [isLoading, setIsLoading] = useState(false);
-  // エラーメッセージ用のStateを追加
-  const [error, setError] = useState<string | null>(null);
+  // Supabaseクライアントのインスタンスを作成
+  const supabase = createClient();
 
+  // ユーザーのセッション情報を保存するためのState
+  const [session, setSession] = useState<Session | null>(null);
+  // 認証状態の読み込みを管理
+  const [loading, setLoading] = useState(true);
 
-  // 4. ボタンがクリックされたときに実行する関数
-  const handleSubmit = async () => {
-    // ボタンをローディング状態にする
-    setIsLoading(true);
-    setResult(null); // 前回の結果をクリア
-    setError(null); // エラーをクリア
+  // コンポーネントがマウントされた時に一度だけ実行
+  useEffect(() => {
+    // 現在のセッションを取得する非同期関数
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+      setLoading(false);
+    };
 
-    // ここにAPIを呼び出す処理を後で書きます
-    console.log("Submitting text:", text);
-    // --- API呼び出し処理 ---
-    try {
-      // .env.localからAPIエンドポイントを取得
-      const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_ENDPOINT;
-      if (!baseUrl) {
-        throw new Error("APIエンドポイントが設定されていません。");
+    getSession();
+
+    // 認証状態（ログイン、ログアウトなど）が変化したときに発火するイベントリスナー
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setSession(session);
       }
+    );
 
-      // ベースURLとパスを結合して完全なURLを作成
-      const endpoint = `${baseUrl}/v1/detect`;
+    // コンポーネントがアンマウントされるときにイベントリスナーを解除
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase.auth]);
 
-      const response = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ text: text }),
-      });
-
-      // APIからのレスポンスがエラーだった場合
-      if (!response.ok) {
-        throw new Error(`APIエラー: ${response.status} ${response.statusText}`);
-      }
-
-      // レスポンスのJSONをパース
-      const rawData = await response.json();
-      const validatedData = AiResponseSchema.parse(rawData);
-      setResult(validatedData);
-
-    } catch (err) {
-      // エラーが発生した場合
-      console.error(err);
-      setError(getErrorMessage(err) || "予期せぬエラーが発生しました。");
-    } finally {
-      // 成功・失敗に関わらずローディングを解除
-      setIsLoading(false);
-    }
-    // --- ここまで ---
+  // ログアウト処理
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    // ページをリロードして状態をリセット
+    window.location.reload();
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center p-24 bg-gray-50">
-      <div className="w-full max-w-2xl">
-        <h1 className="text-4xl font-bold text-center text-gray-800 mb-8">
-          Aura: AI Text Detector
-        </h1>
+    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50 text-gray-800">
+      <div className="w-full max-w-2xl mx-auto">
+        <header className="text-center mb-10">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-800">
+            Aura: AI Text Detector
+          </h1>
+          <p className="text-gray-600 mt-2">
+            文章がAIによって生成されたものか人間によって書かれたものかを判定します。
+          </p>
+        </header>
 
-        {/* 5. 画面に表示する要素 (JSX) */}
-        <div className="flex flex-col gap-4">
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
-            rows={10}
-            placeholder="ここに文章をペーストしてください..."
-          />
-          <button
-            onClick={handleSubmit}
-            disabled={isLoading || !text}
-            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-          >
-            {isLoading ? "判定中..." : "判定する"}
-          </button>
-        </div>
-
-        {/* エラーメッセージ表示エリア */}
-        {error && (
-          <div className="mt-8 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-            <p><strong>エラー:</strong> {error}</p>
+        {/* 認証状態を読み込み中は何も表示しない */}
+        {loading ? (
+          <p className="text-center">読み込み中...</p>
+        ) : !session ? (
+          // セッションがない（未ログイン）場合は、Supabaseの認証UIを表示
+          <div className="p-8 bg-white rounded-lg shadow-lg border border-gray-200">
+            <Auth
+              supabaseClient={supabase}
+              appearance={{ theme: ThemeSupa }}
+              providers={['google']} // Googleログインを有効化
+              localization={{
+                variables: {
+                  sign_in: {
+                    email_label: 'メールアドレス',
+                    password_label: 'パスワード',
+                    email_input_placeholder: 'your@email.com',
+                    password_input_placeholder: '********',
+                    button_label: 'サインイン',
+                    social_provider_text: '{{provider}}でサインイン',
+                    link_text: 'アカウントをお持ちですか？ サインイン',
+                  },
+                  sign_up: {
+                    email_label: 'メールアドレス',
+                    password_label: 'パスワード',
+                    email_input_placeholder: 'your@email.com',
+                    password_input_placeholder: '********',
+                    button_label: 'サインアップ',
+                    social_provider_text: '{{provider}}でサインアップ',
+                    link_text: 'アカウントがありませんか？ サインアップ',
+                  },
+                  forgotten_password: {
+                    email_label: 'メールアドレス',
+                    button_label: 'パスワードをリセット',
+                    link_text: 'パスワードをお忘れですか？',
+                  }
+                }
+              }}
+            />
           </div>
-        )}
-
-        {/* 6. 結果を表示するエリア */}
-        {result && (
-          <div className="mt-8 p-6 bg-white rounded-lg shadow-md border border-gray-200">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-700">判定結果</h2>
-            <div className="text-lg">
-              <p>
-                AIが生成した確率:{" "}
-                <span className="font-bold text-blue-600">
-                  {(result.score * 100).toFixed(2)}%
-                </span>
+        ) : (
+          // セッションがある（ログイン済み）場合は、AI判定コンポーネントとログアウトボタンを表示
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <p className="text-sm text-gray-600">
+                ようこそ, {session.user.email}
               </p>
-              <p>
-                最終判定:{" "}
-                <span className={`font-bold ${result.is_ai ? 'text-red-600' : 'text-green-600'}`}>
-                  {result.is_ai ? "AIの可能性が高い" : "人間の可能性が高い"}
-                </span>
-              </p>
+              <button
+                onClick={handleLogout}
+                className="px-4 py-2 bg-red-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-red-600 transition-colors"
+              >
+                ログアウト
+              </button>
             </div>
-          </div>
+            <Detector session={session} />
+          </>
         )}
       </div>
     </main>
