@@ -1,19 +1,12 @@
 import Link from 'next/link';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { XCircle, Home, RefreshCw, HelpCircle } from "lucide-react";
 
 export default function PaymentCancelPage() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-24 bg-gray-50">
-      <div className="w-full max-w-md mx-auto text-center bg-white p-8 rounded-lg shadow-lg">
-        <h1 className="text-3xl font-bold text-red-600 mb-4">
-          決済はキャンセルされました
-        </h1>
-        <p className="text-gray-700 mb-6">
-          支払いがキャンセルされたか、エラーが発生しました。プランは変更されていません。
-        </p>
-        <Link href="/" className="inline-block px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 transition-colors">
-          ホームに戻る
-        </Link>
-      </div>
-    </main>
-  );
-}
+    <main className="min-h-screen bg-gradient-to-br from-red-50 via-pink-50 to-orange-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md shadow-2xl border-0 overflow-hidden">
+        {/* キャンセル表示背景 */}
+        <div className="relative bg-gradient-to-r from-red-500 to-pink-500 p-8 text-center">
+          <div className="absolute inset-0 bg-white/10 backdrop-blur-sm

@@ -6,6 +6,11 @@ import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import type { Session } from "@supabase/supabase-js";
 import Detector from "@/components/Detector";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, LogOut, Crown, Sparkles } from "lucide-react";
 
 // ユーザープロファイルの型を定義
 type UserProfile = {
@@ -122,102 +127,187 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 sm:p-8 md:p-24 bg-gray-50 text-gray-800">
-      <div className="w-full max-w-2xl mx-auto">
-        <header className="text-center mb-10">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-800">
-            Aura: AI Text Detector
-          </h1>
-          <p className="text-gray-600 mt-2">
-            文章がAIによって生成されたものか人間によって書かれたものかを判定します。
-          </p>
-        </header>
-
-        {/* 認証状態を読み込み中は何も表示しない */}
-        {loading ? (
-          <p className="text-center">読み込み中...</p>
-        ) : !session ? (
-          // セッションがない（未ログイン）場合は、Supabaseの認証UIを表示
-          <div className="p-8 bg-white rounded-lg shadow-lg border border-gray-200">
-            <Auth
-              supabaseClient={supabase}
-              appearance={{ theme: ThemeSupa }}
-              providers={['google']} // Googleログインを有効化
-              localization={{
-                variables: {
-                  sign_in: {
-                    email_label: 'メールアドレス',
-                    password_label: 'パスワード',
-                    email_input_placeholder: 'your@email.com',
-                    password_input_placeholder: '********',
-                    button_label: 'サインイン',
-                    social_provider_text: '{{provider}}でサインイン',
-                    link_text: 'アカウントをお持ちですか？ サインイン',
-                  },
-                  sign_up: {
-                    email_label: 'メールアドレス',
-                    password_label: 'パスワード',
-                    email_input_placeholder: 'your@email.com',
-                    password_input_placeholder: '********',
-                    button_label: 'サインアップ',
-                    social_provider_text: '{{provider}}でサインアップ',
-                    link_text: 'アカウントがありませんか？ サインアップ',
-                  },
-                  forgotten_password: {
-                    email_label: 'メールアドレス',
-                    button_label: 'パスワードをリセット',
-                    link_text: 'パスワードをお忘れですか？',
-                  }
-                }
-              }}
-            />
-          </div>
-        ) : (
-          // セッションがある（ログイン済み）場合は、AI判定コンポーネントとログアウトボタンを表示
-          <>
-            <div className="flex justify-between items-center mb-6">
-              <p className="text-sm text-gray-600">
-                ようこそ, {session.user.email}
-              </p>
-              <div className="flex items-center gap-4">
-                {profile && (
-                  <span className={`px-3 py-1 text-sm font-bold rounded-full ${profile.plan === 'premium'
-                      ? 'bg-yellow-200 text-yellow-800'
-                      : 'bg-gray-200 text-gray-800'
-                    }`}>
-                    {profile.plan.toUpperCase()} プラン
-                  </span>
-                )}
-                <button
-                  onClick={handleLogout}
-                  className="px-4 py-2 bg-red-500 text-white font-semibold text-sm rounded-lg shadow-md hover:bg-red-600 transition-colors"
-                >
-                  ログアウト
-                </button>
-              </div>
+    <main className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-8 md:py-16">
+        <div className="max-w-4xl mx-auto space-y-8">
+          {/* ヘッダーセクション */}
+          <div className="text-center space-y-4">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <Sparkles className="h-8 w-8 text-blue-600" />
+              <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                Aura
+              </h1>
             </div>
+            <p className="text-xl text-slate-600 font-medium">AI Text Detector</p>
+            <p className="text-slate-500 max-w-2xl mx-auto">
+              文章がAIによって生成されたものか人間によって書かれたものかを高精度で判定します
+            </p>
+          </div>
 
-            {/* プレミアムアップグレード促進セクション */}
-            {profile?.plan === 'free' && (
-              <div className="mb-8 p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
-                <h3 className="text-xl font-bold text-blue-800">プレミアムプランにアップグレード</h3>
-                <p className="text-gray-600 mt-2 mb-4">
-                  より高精度な「Deepthink」分析など、全ての機能を利用できます。
-                </p>
-                <button
-                  onClick={handleUpgradeClick}
-                  disabled={isRedirecting}
-                  className="px-6 py-3 bg-yellow-500 text-white font-semibold rounded-lg shadow-md hover:bg-yellow-600 disabled:bg-gray-400 transition-colors"
-                >
-                  {isRedirecting ? "処理中..." : "プレミアムに登録する"}
-                </button>
-                {paymentError && <p className="text-red-500 mt-2 text-sm">{paymentError}</p>}
+          {/* 認証状態を読み込み中 */}
+          {loading ? (
+            <Card className="max-w-md mx-auto">
+              <CardContent className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-2 text-slate-600">読み込み中...</span>
+              </CardContent>
+            </Card>
+          ) : !session ? (
+            // 未ログイン時の認証UI
+            <Card className="max-w-md mx-auto shadow-lg border-0">
+              <CardHeader className="text-center">
+                <CardTitle className="text-2xl">ログイン</CardTitle>
+                <CardDescription>
+                  アカウントにログインして AI 判定機能をご利用ください
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Auth
+                  supabaseClient={supabase}
+                  appearance={{
+                    theme: ThemeSupa,
+                    style: {
+                      button: {
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '500'
+                      },
+                      input: {
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }
+                    }
+                  }}
+                  providers={['google']}
+                  localization={{
+                    variables: {
+                      sign_in: {
+                        email_label: 'メールアドレス',
+                        password_label: 'パスワード',
+                        email_input_placeholder: 'your@email.com',
+                        password_input_placeholder: '********',
+                        button_label: 'サインイン',
+                        social_provider_text: '{{provider}}でサインイン',
+                        link_text: 'アカウントをお持ちですか？ サインイン',
+                      },
+                      sign_up: {
+                        email_label: 'メールアドレス',
+                        password_label: 'パスワード',
+                        email_input_placeholder: 'your@email.com',
+                        password_input_placeholder: '********',
+                        button_label: 'サインアップ',
+                        social_provider_text: '{{provider}}でサインアップ',
+                        link_text: 'アカウントがありませんか？ サインアップ',
+                      },
+                      forgotten_password: {
+                        email_label: 'メールアドレス',
+                        button_label: 'パスワードをリセット',
+                        link_text: 'パスワードをお忘れですか？',
+                      }
+                    }
+                  }}
+                />
+              </CardContent>
+            </Card>
+          ) : (
+            // ログイン済みの場合
+            <>
+              {/* ユーザー情報ヘッダー */}
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <span className="text-white font-bold text-sm">
+                      {session.user.email?.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700">
+                      {session.user.email}
+                    </p>
+                    <p className="text-sm text-slate-500">ようこそお帰りなさい</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {profile && (
+                    <Badge
+                      variant={profile.plan === 'premium' ? 'default' : 'secondary'}
+                      className={profile.plan === 'premium'
+                        ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0'
+                        : 'bg-slate-100 text-slate-700'
+                      }
+                    >
+                      {profile.plan === 'premium' ? (
+                        <>
+                          <Crown className="w-3 h-3 mr-1" />
+                          PREMIUM
+                        </>
+                      ) : (
+                        'FREE'
+                      )}
+                    </Badge>
+                  )}
+                  <Button
+                    onClick={handleLogout}
+                    variant="outline"
+                    size="sm"
+                    className="hover:bg-red-50 hover:border-red-200 hover:text-red-700"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    ログアウト
+                  </Button>
+                </div>
               </div>
-            )}
 
-            <Detector session={session} />
-          </>
-        )}
+              {/* プレミアムアップグレードセクション */}
+              {profile?.plan === 'free' && (
+                <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
+                  <CardContent className="p-8 text-center">
+                    <div className="flex justify-center mb-4">
+                      <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
+                        <Crown className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                    <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                      プレミアムプランにアップグレード
+                    </h3>
+                    <p className="text-slate-600 mb-6 max-w-lg mx-auto">
+                      より高精度な「Deepthink」分析など、全ての機能を利用できます。
+                      プロフェッショナルな文章判定をお試しください。
+                    </p>
+                    <Button
+                      onClick={handleUpgradeClick}
+                      disabled={isRedirecting}
+                      size="lg"
+                      className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0 shadow-lg"
+                    >
+                      {isRedirecting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          処理中...
+                        </>
+                      ) : (
+                        <>
+                          <Crown className="w-4 h-4 mr-2" />
+                          プレミアムに登録する
+                        </>
+                      )}
+                    </Button>
+                    {paymentError && (
+                      <Alert className="mt-4 border-red-200 bg-red-50">
+                        <AlertDescription className="text-red-700">
+                          {paymentError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* AI判定コンポーネント */}
+              <Detector session={session} />
+            </>
+          )}
+        </div>
       </div>
     </main>
   );

@@ -4,6 +4,13 @@ import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { AiResponseSchema, AiResponseType } from '@/lib/schemas';
 import { getErrorMessage } from '@/lib/errorUtils';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Progress } from "@/components/ui/progress";
+import { Loader2, Brain, User, AlertTriangle, CheckCircle, FileText } from "lucide-react";
 
 // SupabaseのSessionをPropsとして受け取るように型定義
 type Props = {
@@ -29,7 +36,6 @@ export default function Detector({ session }: Props) {
 
       // SupabaseセッションからJWTを取得
       const accessToken = session.access_token;
-
       const endpoint = `${baseUrl}/v1/detect`;
 
       const response = await fetch(endpoint, {
@@ -62,49 +68,154 @@ export default function Detector({ session }: Props) {
     }
   };
 
-  return (
-    <div className="w-full max-w-2xl">
-      <div className="flex flex-col gap-4">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          className="w-full p-4 border border-gray-300 rounded-lg shadow-sm focus:ring-2 focus:ring-blue-500 focus:outline-none bg-white text-gray-800"
-          rows={10}
-          placeholder="ここに文章をペーストしてください..."
-        />
-        <button
-          onClick={handleSubmit}
-          disabled={isLoading || !text}
-          className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg shadow-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-        >
-          {isLoading ? "判定中..." : "判定する"}
-        </button>
-      </div>
+  const getConfidenceLevel = (score: number) => {
+    if (score >= 0.8) return { level: "高", color: "text-red-600" };
+    if (score >= 0.6) return { level: "中", color: "text-yellow-600" };
+    return { level: "低", color: "text-green-600" };
+  };
 
+  const formatScore = (score: number) => (score * 100).toFixed(1);
+
+  return (
+    <div className="space-y-6">
+      {/* 入力セクション */}
+      <Card className="shadow-lg border-0">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-600" />
+            <CardTitle className="text-xl">文章を入力</CardTitle>
+          </div>
+          <CardDescription>
+            判定したい文章を下記のテキストエリアに貼り付けてください
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <Textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            className="min-h-[200px] resize-none focus:ring-2 focus:ring-blue-500 border-slate-200"
+            placeholder="ここに文章をペーストしてください..."
+          />
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-slate-500">
+              文字数: {text.length.toLocaleString()}
+            </p>
+            <Button
+              onClick={handleSubmit}
+              disabled={isLoading || !text.trim()}
+              size="lg"
+              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  分析中...
+                </>
+              ) : (
+                <>
+                  <Brain className="w-4 h-4 mr-2" />
+                  AI判定を実行
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* エラー表示 */}
       {error && (
-        <div className="mt-8 p-4 bg-red-100 border border-red-400 text-red-700 rounded-lg">
-          <p><strong>エラー:</strong> {error}</p>
-        </div>
+        <Alert className="border-red-200 bg-red-50">
+          <AlertTriangle className="w-4 h-4" />
+          <AlertDescription className="text-red-700">
+            <strong>エラー:</strong> {error}
+          </AlertDescription>
+        </Alert>
       )}
 
+      {/* 結果表示 */}
       {result && (
-        <div className="mt-8 p-6 bg-white rounded-lg shadow-md border border-gray-200">
-          <h2 className="text-2xl font-semibold mb-4 text-gray-700">判定結果</h2>
-          <div className="text-lg space-y-2">
-            <p>
-              AIが生成した確率:{" "}
-              <span className="font-bold text-blue-600">
-                {(result.score * 100).toFixed(2)}%
-              </span>
-            </p>
-            <p>
-              最終判定:{" "}
-              <span className={`font-bold ${result.is_ai ? 'text-red-600' : 'text-green-600'}`}>
-                {result.is_ai ? "AIの可能性が高い" : "人間の可能性が高い"}
-              </span>
-            </p>
-          </div>
-        </div>
+        <Card className="shadow-xl border-0 bg-gradient-to-br from-white to-slate-50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-5 h-5 text-green-600" />
+              <CardTitle className="text-2xl">判定結果</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* スコア表示 */}
+            <div className="space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-600">AI生成の確率</span>
+                <span className="text-2xl font-bold text-blue-600">
+                  {formatScore(result.score)}%
+                </span>
+              </div>
+              <Progress
+                value={result.score * 100}
+                className="h-3"
+              />
+            </div>
+
+            {/* 判定結果 */}
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="p-4 rounded-lg border bg-white/50">
+                <div className="flex items-center gap-2 mb-2">
+                  {result.is_ai ? (
+                    <Brain className="w-5 h-5 text-red-600" />
+                  ) : (
+                    <User className="w-5 h-5 text-green-600" />
+                  )}
+                  <span className="font-semibold text-slate-700">最終判定</span>
+                </div>
+                <Badge
+                  variant={result.is_ai ? "destructive" : "default"}
+                  className={`text-base px-3 py-1 ${result.is_ai
+                      ? "bg-red-100 text-red-800 hover:bg-red-200"
+                      : "bg-green-100 text-green-800 hover:bg-green-200"
+                    }`}
+                >
+                  {result.is_ai ? "AI生成の可能性が高い" : "人間による執筆の可能性が高い"}
+                </Badge>
+              </div>
+
+              <div className="p-4 rounded-lg border bg-white/50">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-5 h-5 text-yellow-600" />
+                  <span className="font-semibold text-slate-700">信頼度</span>
+                </div>
+                <Badge
+                  variant="outline"
+                  className={`text-base px-3 py-1 border-current ${getConfidenceLevel(result.score).color}`}
+                >
+                  {getConfidenceLevel(result.score).level}
+                </Badge>
+              </div>
+            </div>
+
+            {/* 詳細な説明 */}
+            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+              <h4 className="font-semibold text-blue-900 mb-2">判定について</h4>
+              <p className="text-blue-800 text-sm leading-relaxed">
+                {result.is_ai
+                  ? `この文章はAIによって生成された可能性が${formatScore(result.score)}%です。文章の構造、語彙選択、文体などからAI特有のパターンが検出されました。`
+                  : `この文章は人間によって書かれた可能性が${formatScore(1 - result.score)}%です。自然な文章の流れや人間らしい表現が確認されました。`
+                }
+              </p>
+            </div>
+
+            {/* 注意事項 */}
+            <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+              <h4 className="font-semibold text-amber-900 mb-2 flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" />
+                ご注意
+              </h4>
+              <p className="text-amber-800 text-sm">
+                この判定結果は参考情報です。100%の精度を保証するものではありません。
+                重要な判断を行う際は、他の検証方法も合わせてご利用ください。
+              </p>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </div>
   );
