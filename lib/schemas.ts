@@ -3,10 +3,33 @@ import { z } from "zod";
 // スキーマを定義してエクスポートする
 export const AiResponseSchema = z.object({
   is_ai: z.boolean(),
-  score: z.number(),
+  score: z.number().min(0).max(1),
 });
 
 // ↑のスキーマからTypeScriptの型を生成してエクスポート
 export type AiResponseType = z.infer<typeof AiResponseSchema>;
 
 // 他のスキーマもここに追加できる
+
+
+// 単一の履歴アイテムのスキーマ
+export const DetectionSchema = z.object({
+  id: z.string().uuid(),
+  user_id: z.string().uuid(),
+  input_text: z.string(),
+  score: z.number().min(0).max(1),
+  is_ai: z.boolean(),
+  created_at: z.string().datetime(), // APIからはISO文字列で渡される
+});
+
+// 履歴アイテムの配列のスキーマ
+export const DetectionsListSchema = z.array(DetectionSchema);
+
+// APIレスポンス全体のスキーマ (/v1/detections)
+export const ListDetectionsResponseSchema = z.object({
+  items: DetectionsListSchema,
+  total: z.number().int(),
+});
+
+// フロントエンドで使いやすいように型をエクスポート
+export type Detection = z.infer<typeof DetectionSchema>;

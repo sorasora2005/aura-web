@@ -15,11 +15,14 @@ import { Loader2, Brain, User, AlertTriangle, CheckCircle, FileText } from "luci
 // SupabaseのSessionをPropsとして受け取るように型定義
 type Props = {
   session: Session;
+  onDetectionSuccess: () => void; // 判定成功時のコールバック関数
+  text: string;
+  setText: (text: string) => void;
+  result: AiResponseType | null;
+  setResult: (result: AiResponseType | null) => void;
 };
 
-export default function Detector({ session }: Props) {
-  const [text, setText] = useState("");
-  const [result, setResult] = useState<AiResponseType | null>(null);
+export default function Detector({ session, onDetectionSuccess, text, setText, result, setResult }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,6 +62,9 @@ export default function Detector({ session }: Props) {
       const rawData = await response.json();
       const validatedData = AiResponseSchema.parse(rawData);
       setResult(validatedData);
+
+      // --- 成功時にコールバックを呼び出す ---
+      onDetectionSuccess();
 
     } catch (err) {
       console.error(err);
@@ -170,8 +176,8 @@ export default function Detector({ session }: Props) {
                 <Badge
                   variant={result.is_ai ? "destructive" : "default"}
                   className={`text-base px-3 py-1 ${result.is_ai
-                      ? "bg-red-100 text-red-800 hover:bg-red-200"
-                      : "bg-green-100 text-green-800 hover:bg-green-200"
+                    ? "bg-red-100 text-red-800 hover:bg-red-200"
+                    : "bg-green-100 text-green-800 hover:bg-green-200"
                     }`}
                 >
                   {result.is_ai ? "AI生成の可能性が高い" : "人間による執筆の可能性が高い"}

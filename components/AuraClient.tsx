@@ -1,17 +1,22 @@
 // components/AuraClient.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import type { Session } from "@supabase/supabase-js";
+import { AiResponseType } from '@/lib/schemas';
 import Detector from "@/components/Detector";
+import History from "@/components/History";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LogOut, Crown } from "lucide-react";
+import { Loader2, LogOut, Crown, PenSquare, History as HistoryIcon } from "lucide-react";
+import { ListDetectionsResponseSchema, Detection } from "@/lib/schemas";
+import { getErrorMessage } from "@/lib/errorUtils";
 
 // ユーザープロファイルの型を定義
 type UserProfile = {
@@ -58,6 +63,69 @@ export default function AuraClient() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // 履歴機能用のState
+  const [detections, setDetections] = useState<Detection[]>([]);
+  const [historyPage, setHistoryPage] = useState(0); // 0-indexed page
+  const [hasMoreHistory, setHasMoreHistory] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("detector");
+  const HISTORY_PAGE_LIMIT = 3;
+
+  // Detector の状態を親で管理する
+  const [detectorText, setDetectorText] = useState("");
+  const [detectionResult, setDetectionResult] = useState<AiResponseType | null>(null);
+
+
+  // 履歴取得関数
+  const fetchHistory = useCallback(async (page: number, fresh = false) => {
+    if (!session) return;
+    setHistoryLoading(true);
+    setHistoryError(null);
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_FASTAPI_ENDPOINT;
+      const skip = page * HISTORY_PAGE_LIMIT;
+      const endpoint = `${baseUrl}/v1/detections?skip=${skip}&limit=${HISTORY_PAGE_LIMIT}`;
+
+      const response = await fetch(endpoint, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error("履歴の取得に失敗しました。");
+      }
+      const rawData = await response.json();
+      const validatedData = ListDetectionsResponseSchema.parse(rawData);
+
+      setDetections(prev => fresh ? validatedData.items : [...prev, ...validatedData.items]);
+      setHasMoreHistory(validatedData.items.length === HISTORY_PAGE_LIMIT);
+
+    } catch (err) {
+      setHistoryError(getErrorMessage(err));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, [session]);
+
+  // ページネーション用の関数
+  const loadMoreHistory = () => {
+    const nextPage = historyPage + 1;
+    setHistoryPage(nextPage);
+    fetchHistory(nextPage);
+  };
+
+  // 判定成功時に履歴をリフレッシュする関数
+  const handleDetectionSuccess = () => {
+    // 既存の履歴をクリアして、再取得を促す
+    setDetections([]);
+    setHistoryPage(0);
+    setHasMoreHistory(true);
+    // これで、次に履歴タブを開いたときに useEffect が走り、fetchHistory(0) が実行される
+  };
+
   // コンポーネントがマウントされた時に一度だけ実行
   useEffect(() => {
     // 現在のセッションとプロファイル情報を取得する非同期関数
@@ -95,6 +163,10 @@ export default function AuraClient() {
           getProfile();
         } else {
           setProfile(null);
+          // ログアウト時に履歴をクリア
+          setDetections([]);
+          setHistoryPage(0);
+          setHasMoreHistory(true);
         }
       }
     );
@@ -104,6 +176,14 @@ export default function AuraClient() {
       subscription.unsubscribe();
     };
   }, [supabase]);
+
+  // タブが切り替わったときに履歴を取得するEffect
+  useEffect(() => {
+    // 履歴タブが選択され、かつデータがまだ読み込まれていない場合に最初のデータを取得
+    if (activeTab === 'history' && detections.length === 0 && hasMoreHistory) {
+      fetchHistory(0);
+    }
+  }, [activeTab, detections.length, fetchHistory, hasMoreHistory]);
 
   // ログアウト処理
   const handleLogout = async () => {
@@ -286,8 +366,36 @@ export default function AuraClient() {
           </Card>
         )}
 
-        {/* AI判定コンポーネント */}
-        <Detector session={session} />
+        {/* タブUIセクション */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="detector">
+              <PenSquare className="w-4 h-4 mr-2" />
+              AI判定
+            </TabsTrigger>
+            <TabsTrigger value="history">
+              <HistoryIcon className="w-4 h-4 mr-2" />
+              判定履歴
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="detector" className="mt-6">
+            <Detector session={session} onDetectionSuccess={handleDetectionSuccess} text={detectorText} setText={setDetectorText} result={detectionResult} setResult={setDetectionResult} />
+          </TabsContent>
+          <TabsContent value="history" className="mt-6">
+            {historyError ? (
+              <Alert variant="destructive">
+                <AlertDescription>{historyError}</AlertDescription>
+              </Alert>
+            ) : (
+              <History
+                detections={detections}
+                onLoadMore={loadMoreHistory}
+                hasMore={hasMoreHistory}
+                isLoading={historyLoading}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       </>
     )
   );
