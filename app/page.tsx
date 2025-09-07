@@ -2,6 +2,8 @@
 
 import AuraClient from "@/components/AuraClient"; // これから作成するクライアントコンポーネント
 import { Sparkles } from "lucide-react";
+import { Suspense } from 'react';
+
 
 export default function Home() {
   return (
@@ -23,7 +25,9 @@ export default function Home() {
           </div>
 
           {/* 動的な部分はすべてこのクライアントコンポーネントに任せる */}
-          <AuraClient />
+          <Suspense fallback={<p>Loading...</p>}>
+            <AuraClient />
+          </Suspense>
         </div>
       </div>
     </main>
