@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { AiResponseSchema, AiResponseType } from '@/lib/schemas';
 import { getErrorMessage } from '@/lib/errorUtils';
@@ -20,11 +19,25 @@ type Props = {
   setText: (text: string) => void;
   result: AiResponseType | null;
   setResult: (result: AiResponseType | null) => void;
+  // 状態管理をAuraClientから受け取る（State Lifting）
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  error: string | null;
+  setError: (error: string | null) => void;
 };
 
-export default function Detector({ session, onDetectionSuccess, text, setText, result, setResult }: Props) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function Detector({
+  session,
+  onDetectionSuccess,
+  text,
+  setText,
+  result,
+  setResult,
+  isLoading,
+  setIsLoading,
+  error,
+  setError
+}: Props) {
 
   const handleSubmit = async () => {
     setIsLoading(true);

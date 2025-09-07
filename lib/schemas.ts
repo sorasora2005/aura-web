@@ -33,3 +33,18 @@ export const ListDetectionsResponseSchema = z.object({
 
 // フロントエンドで使いやすいように型をエクスポート
 export type Detection = z.infer<typeof DetectionSchema>;
+
+// ダッシュボード統計API用のスキーマを追加
+export const DailyActivitySchema = z.object({
+  date: z.string(), // or z.date() if you parse it
+  count: z.number(),
+});
+
+export const DashboardStatsResponseSchema = z.object({
+  total_requests: z.number(),
+  ai_detection_rate: z.number(),
+  average_score: z.number(),
+  daily_activity: z.array(DailyActivitySchema),
+});
+
+export type DashboardStats = z.infer<typeof DashboardStatsResponseSchema>;

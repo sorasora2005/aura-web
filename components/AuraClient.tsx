@@ -14,9 +14,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LogOut, Crown, PenSquare, History as HistoryIcon } from "lucide-react";
+import { Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon } from "lucide-react";
 import { ListDetectionsResponseSchema, Detection } from "@/lib/schemas";
 import { getErrorMessage } from "@/lib/errorUtils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import Link from "next/link";
+import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
 // ユーザープロファイルの型を定義
 type UserProfile = {
@@ -52,6 +62,12 @@ const createCheckoutSession = async (accessToken: string) => {
 export default function AuraClient() {
   // Supabaseクライアントのインスタンスを作成
   const supabase = createClient();
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // URLから現在のアクティブなタブを決定する。URLにtabがなければ'detector'をデフォルトに。
+  const activeTab = searchParams.get("tab") === "history" ? "history" : "detector";
 
   // ユーザーのセッション情報を保存するためのState
   const [session, setSession] = useState<Session | null>(null);
@@ -69,13 +85,29 @@ export default function AuraClient() {
   const [hasMoreHistory, setHasMoreHistory] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("detector");
-  const HISTORY_PAGE_LIMIT = 3;
 
-  // Detector の状態を親で管理する
+  // Detector の状態を親で管理する（リフトアップ）
   const [detectorText, setDetectorText] = useState("");
   const [detectionResult, setDetectionResult] = useState<AiResponseType | null>(null);
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectionError, setDetectionError] = useState<string | null>(null);
 
+  const HISTORY_PAGE_LIMIT = 3;
+
+  // タブが変更されたときにURLを更新するハンドラ
+  const handleTabChange = (tab: string) => {
+    const params = new URLSearchParams(searchParams);
+    if (tab === "detector") {
+      // デフォルトタブの場合はクエリパラメータを削除
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+    // URLを書き換える
+    const queryString = params.toString();
+    const newUrl = queryString ? `${pathname}?${queryString}` : pathname;
+    router.push(newUrl);
+  };
 
   // 履歴取得関数
   const fetchHistory = useCallback(async (page: number, fresh = false) => {
@@ -108,7 +140,7 @@ export default function AuraClient() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [session]);
+  }, [session, HISTORY_PAGE_LIMIT]);
 
   // ページネーション用の関数
   const loadMoreHistory = () => {
@@ -167,6 +199,11 @@ export default function AuraClient() {
           setDetections([]);
           setHistoryPage(0);
           setHasMoreHistory(true);
+          // Detector の状態もクリア
+          setDetectorText("");
+          setDetectionResult(null);
+          setIsDetecting(false);
+          setDetectionError(null);
         }
       }
     );
@@ -180,10 +217,10 @@ export default function AuraClient() {
   // タブが切り替わったときに履歴を取得するEffect
   useEffect(() => {
     // 履歴タブが選択され、かつデータがまだ読み込まれていない場合に最初のデータを取得
-    if (activeTab === 'history' && detections.length === 0 && hasMoreHistory) {
-      fetchHistory(0);
+    if (activeTab === 'history' && detections.length === 0 && hasMoreHistory && session) {
+      fetchHistory(0, true);
     }
-  }, [activeTab, detections.length, fetchHistory, hasMoreHistory]);
+  }, [activeTab, detections.length, fetchHistory, hasMoreHistory, session]);
 
   // ログアウト処理
   const handleLogout = async () => {
@@ -284,41 +321,56 @@ export default function AuraClient() {
               </span>
             </div>
             <div>
-              <p className="font-medium text-slate-700">
+              <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">
                 {session.user.email}
               </p>
-              <p className="text-sm text-slate-500">ようこそお帰りなさい</p>
+              {profile && (
+                <Badge
+                  variant={profile.plan === 'premium' ? 'default' : 'secondary'}
+                  className={`mt-1 ${profile.plan === 'premium'
+                    ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0'
+                    : 'bg-slate-100 text-slate-700'
+                    }`}
+                >
+                  {profile.plan === 'premium' ? (
+                    <>
+                      <Crown className="w-3 h-3 mr-1" />
+                      PREMIUM
+                    </>
+                  ) : (
+                    'FREE'
+                  )}
+                </Badge>
+              )}
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            {profile && (
-              <Badge
-                variant={profile.plan === 'premium' ? 'default' : 'secondary'}
-                className={profile.plan === 'premium'
-                  ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0'
-                  : 'bg-slate-100 text-slate-700'
-                }
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="w-full sm:w-auto"
               >
-                {profile.plan === 'premium' ? (
-                  <>
-                    <Crown className="w-3 h-3 mr-1" />
-                    PREMIUM
-                  </>
-                ) : (
-                  'FREE'
-                )}
-              </Badge>
-            )}
-            <Button
-              onClick={handleLogout}
-              variant="outline"
-              size="sm"
-              className="hover:bg-red-50 hover:border-red-200 hover:text-red-700"
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              ログアウト
-            </Button>
-          </div>
+                メニュー
+                <ChevronsUpDown className="w-4 h-4 ml-2" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard">
+                  <LayoutGrid className="w-4 h-4 mr-2" />
+                  <span>ダッシュボード</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                <LogOut className="w-4 h-4 mr-2" />
+                <span>ログアウト</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* プレミアムアップグレードセクション */}
@@ -367,7 +419,7 @@ export default function AuraClient() {
         )}
 
         {/* タブUIセクション */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="detector">
               <PenSquare className="w-4 h-4 mr-2" />
@@ -379,7 +431,18 @@ export default function AuraClient() {
             </TabsTrigger>
           </TabsList>
           <TabsContent value="detector" className="mt-6">
-            <Detector session={session} onDetectionSuccess={handleDetectionSuccess} text={detectorText} setText={setDetectorText} result={detectionResult} setResult={setDetectionResult} />
+            <Detector
+              session={session}
+              onDetectionSuccess={handleDetectionSuccess}
+              text={detectorText}
+              setText={setDetectorText}
+              result={detectionResult}
+              setResult={setDetectionResult}
+              isLoading={isDetecting}
+              setIsLoading={setIsDetecting}
+              error={detectionError}
+              setError={setDetectionError}
+            />
           </TabsContent>
           <TabsContent value="history" className="mt-6">
             {historyError ? (
