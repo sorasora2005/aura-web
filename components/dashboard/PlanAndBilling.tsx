@@ -4,14 +4,20 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Crown, CreditCard, Loader2, CheckCircle, ExternalLink } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Crown, CreditCard, Loader2, CalendarClock, ExternalLink } from "lucide-react";
 import { getErrorMessage } from '@/lib/errorUtils';
 import type { Session } from "@supabase/supabase-js";
+import { format } from 'date-fns'; // date-fnsからformat関数をインポート
+import { ja } from 'date-fns/locale'; // 日本語ロケールをインポート
 
 type Props = {
   session: Session;
-  profile: { plan: 'free' | 'premium', stripe_customer_id?: string };
+  profile: {
+    plan: 'free' | 'premium',
+    stripe_customer_id?: string,
+    plan_expires_at?: string | null
+  };
 };
 
 export default function PlanAndBilling({ session, profile }: Props) {
@@ -91,6 +97,17 @@ export default function PlanAndBilling({ session, profile }: Props) {
                 PREMIUM
               </Badge>
             </div>
+            {/* plan_expires_at が存在する場合の表示 */}
+            {profile.plan_expires_at && (
+              <Alert className="bg-yellow-50 border-yellow-200">
+                <CalendarClock className="h-4 w-4" />
+                <AlertTitle>プラン変更の予定</AlertTitle>
+                <AlertDescription>
+                  現在のプレミアムプランは **{format(new Date(profile.plan_expires_at), 'yyyy年M月d日', { locale: ja })}** まで有効です。
+                  それ以降はフリープランに移行します。
+                </AlertDescription>
+              </Alert>
+            )}
             <div className="pt-4 border-t">
               <p className="text-sm text-slate-600 mb-2">支払い方法の変更や請求履歴の確認は、Stripeのカスタマーポータルで行うことができます。</p>
               <Button

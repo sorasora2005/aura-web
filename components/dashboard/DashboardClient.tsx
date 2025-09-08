@@ -21,6 +21,7 @@ type UserProfile = {
   plan: 'free' | 'premium';
   request_count: number;
   stripe_customer_id?: string;
+  plan_expires_at?: string | null; // 解約予定日 (timestampz)
 };
 
 export default function DashboardClient() {
@@ -49,7 +50,7 @@ export default function DashboardClient() {
         fetch(`${baseUrl}/v1/detections?limit=5`, {
           headers: { Authorization: `Bearer ${session.access_token}` },
         }),
-        supabase.from('profiles').select('plan, request_count, stripe_customer_id').single(),
+        supabase.from('profiles').select('plan, request_count, stripe_customer_id, plan_expires_at').single(),
       ]);
 
       // 各レスポンスを処理
