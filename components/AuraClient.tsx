@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon } from "lucide-react";
+import { Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon, CalendarClock } from "lucide-react";
 import { ListDetectionsResponseSchema, Detection } from "@/lib/schemas";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
@@ -32,6 +32,7 @@ import { useSearchParams, useRouter, usePathname } from "next/navigation";
 type UserProfile = {
   plan: 'free' | 'premium';
   request_count: number;
+  plan_expires_at?: string | null;
 };
 
 // 決済セッション作成をリクエストする関数
@@ -169,7 +170,7 @@ export default function AuraClient() {
       if (session) {
         const { data: profileData } = await supabase
           .from('profiles')
-          .select('plan, request_count')
+          .select('plan, request_count, plan_expires_at')
           .single();
         setProfile(profileData as UserProfile);
       }
@@ -188,7 +189,7 @@ export default function AuraClient() {
           const getProfile = async () => {
             const { data: profileData } = await supabase
               .from('profiles')
-              .select('plan, request_count')
+              .select('plan, request_count, plan_expires_at')
               .single();
             setProfile(profileData as UserProfile);
           };
@@ -316,35 +317,29 @@ export default function AuraClient() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">
-                {session.user.email?.charAt(0).toUpperCase()}
-              </span>
+              <span className="text-white font-bold text-sm">{session.user.email?.charAt(0).toUpperCase()}</span>
             </div>
             <div>
-              <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">
-                {session.user.email}
-              </p>
+              <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">{session.user.email}</p>
               {profile && (
-                <Badge
-                  variant={profile.plan === 'premium' ? 'default' : 'secondary'}
-                  className={`mt-1 ${profile.plan === 'premium'
-                    ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0'
-                    : 'bg-slate-100 text-slate-700'
-                    }`}
-                >
-                  {profile.plan === 'premium' ? (
-                    <>
-                      <Crown className="w-3 h-3 mr-1" />
-                      PREMIUM
-                    </>
-                  ) : (
-                    'FREE'
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge
+                    variant={profile.plan === 'premium' ? 'default' : 'secondary'}
+                    className={`${profile.plan === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0' : 'bg-slate-100 text-slate-700'}`}
+                  >
+                    {profile.plan === 'premium' ? <><Crown className="w-3 h-3 mr-1" />PREMIUM</> : 'FREE'}
+                  </Badge>
+                  {/* ✨ CHANGED: 解約予定がある場合に情報を表示 */}
+                  {profile.plan_expires_at && (
+                    <div className="flex items-center gap-1 text-xs text-yellow-600">
+                      <CalendarClock className="w-3 h-3" />
+                      <span>解約予定</span>
+                    </div>
                   )}
-                </Badge>
+                </div>
               )}
             </div>
           </div>
-
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
