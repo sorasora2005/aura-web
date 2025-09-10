@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon, CalendarClock } from "lucide-react";
+import { AlertCircle, Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon, CalendarClock } from "lucide-react";
 import { ListDetectionsResponseSchema, Detection } from "@/lib/schemas";
 import { getErrorMessage } from "@/lib/errorUtils";
 import {
@@ -25,6 +25,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import Link from "next/link";
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 
@@ -92,6 +101,9 @@ export default function AuraClient() {
   const [detectionResult, setDetectionResult] = useState<AiResponseType | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectionError, setDetectionError] = useState<string | null>(null);
+
+  // Alertダイアログ表示用のState
+  const [isDeletedAccountDialogOpen, setIsDeletedAccountDialogOpen] = useState(false);
 
   const HISTORY_PAGE_LIMIT = 3;
 
@@ -163,19 +175,31 @@ export default function AuraClient() {
   useEffect(() => {
     // 現在のセッションとプロファイル情報を取得する非同期関数
     const getSessionAndProfile = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setSession(session);
 
-      // ログインしている場合、プロフィール情報を取得
-      if (session) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('plan, request_count, plan_expires_at')
-          .single();
-        setProfile(profileData as UserProfile);
+        // ログインしている場合、プロフィール情報を取得
+        if (session) {
+          const { data: profileData, error } = await supabase
+            .from('profiles')
+            .select('plan, request_count, plan_expires_at')
+            .maybeSingle();
+
+          if (error) throw error;
+          if (profileData === null) {
+            // データが見つからなかった = 削除済みユーザー
+            showDeletedAccountDialog();
+            return; // 後続の処理を中断
+          }
+          setProfile(profileData as UserProfile);
+        }
+      } catch (error) {
+        // .maybeSingle()を使った場合、ここに来るのはネットワークエラーなど予期せぬエラーのみ
+        console.error("プロファイル取得で予期せぬエラー:", error);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     };
 
     getSessionAndProfile();
@@ -186,14 +210,32 @@ export default function AuraClient() {
         setSession(session);
         // 認証状態が変わったらプロフィールも再取得
         if (session) {
-          const getProfile = async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('plan, request_count, plan_expires_at')
-              .single();
-            setProfile(profileData as UserProfile);
-          };
-          getProfile();
+          (async () => {
+            try {
+              // getProfileを定義
+              const { data: profileData, error } = await supabase
+                .from('profiles')
+                .select('plan, request_count, plan_expires_at')
+                .maybeSingle();
+
+              // エラーがあれば例外を投げる
+              if (error) throw error;
+              if (profileData === null) {
+                // データが見つからなかった = 削除済みユーザー
+                showDeletedAccountDialog();
+                return; // 後続の処理を中断
+              }
+              // 有効なユーザーのプロファイルが取得できた          
+              setProfile(profileData as UserProfile);
+
+            } catch (error) {
+              // ★★★ 型ガードで error の型をチェックする ★★★
+              console.log("Caught Error Object:", error);
+            } finally {
+              // setLoading は try または catch が終わった後に必ず実行される
+              setLoading(false);
+            }
+          })();
         } else {
           setProfile(null);
           // ログアウト時に履歴をクリア
@@ -230,6 +272,10 @@ export default function AuraClient() {
     window.location.reload();
   };
 
+  const showDeletedAccountDialog = () => {
+    setIsDeletedAccountDialogOpen(true);
+  };
+
   // アップグレード処理
   const handleUpgradeClick = async () => {
     if (!session) return;
@@ -246,215 +292,238 @@ export default function AuraClient() {
   };
 
   return (
-    loading ? (
-      <Card className="max-w-md mx-auto">
-        <CardContent className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-          <span className="ml-2 text-slate-600">読み込み中...</span>
-        </CardContent>
-      </Card>
-    ) : !session ? (
-      // 未ログイン時の認証UI
-      <Card className="max-w-md mx-auto shadow-lg border-0">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">ログイン</CardTitle>
-          <CardDescription>
-            アカウントにログインして AI 判定機能をご利用ください
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Auth
-            supabaseClient={supabase}
-            appearance={{
-              theme: ThemeSupa,
-              style: {
-                button: {
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '500'
-                },
-                input: {
-                  borderRadius: '8px',
-                  fontSize: '14px'
-                }
-              }
-            }}
-            providers={['google']}
-            localization={{
-              variables: {
-                sign_in: {
-                  email_label: 'メールアドレス',
-                  password_label: 'パスワード',
-                  email_input_placeholder: 'your@email.com',
-                  password_input_placeholder: '********',
-                  button_label: 'サインイン',
-                  social_provider_text: '{{provider}}でサインイン',
-                  link_text: 'アカウントをお持ちですか？ サインイン',
-                },
-                sign_up: {
-                  email_label: 'メールアドレス',
-                  password_label: 'パスワード',
-                  email_input_placeholder: 'your@email.com',
-                  password_input_placeholder: '********',
-                  button_label: 'サインアップ',
-                  social_provider_text: '{{provider}}でサインアップ',
-                  link_text: 'アカウントがありませんか？ サインアップ',
-                },
-                forgotten_password: {
-                  email_label: 'メールアドレス',
-                  button_label: 'パスワードをリセット',
-                  link_text: 'パスワードをお忘れですか？',
-                }
-              }
-            }}
-          />
-        </CardContent>
-      </Card>
-    ) : (
-      // ログイン済みの場合
-      <>
-        {/* ユーザー情報ヘッダー */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-              <span className="text-white font-bold text-sm">{session.user.email?.charAt(0).toUpperCase()}</span>
-            </div>
-            <div>
-              <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">{session.user.email}</p>
-              {profile && (
-                <div className="flex items-center gap-2 mt-1">
-                  <Badge
-                    variant={profile.plan === 'premium' ? 'default' : 'secondary'}
-                    className={`${profile.plan === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0' : 'bg-slate-100 text-slate-700'}`}
-                  >
-                    {profile.plan === 'premium' ? <><Crown className="w-3 h-3 mr-1" />PREMIUM</> : 'FREE'}
-                  </Badge>
-                  {/* ✨ CHANGED: 解約予定がある場合に情報を表示 */}
-                  {profile.plan_expires_at && (
-                    <div className="flex items-center gap-1 text-xs text-yellow-600">
-                      <CalendarClock className="w-3 h-3" />
-                      <span>解約予定</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                className="w-full sm:w-auto"
-              >
-                メニュー
-                <ChevronsUpDown className="w-4 h-4 ml-2" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/dashboard">
-                  <LayoutGrid className="w-4 h-4 mr-2" />
-                  <span>ダッシュボード</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                <LogOut className="w-4 h-4 mr-2" />
-                <span>ログアウト</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+    <>
+      {/* ★ 追加: AlertDialogコンポーネント */}
+      <AlertDialog open={isDeletedAccountDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-6 w-6 text-red-500" />
+              アカウントが削除されました
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              このアカウントは削除されているため、サービスの利用を継続することはできません。
+              「OK」ボタンを押してログアウトしてください。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={handleLogout} className="bg-red-600 text-white hover:bg-red-700">
+              OK
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-        {/* プレミアムアップグレードセクション */}
-        {profile?.plan === 'free' && (
-          <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
-            <CardContent className="p-8 text-center">
-              <div className="flex justify-center mb-4">
-                <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
-                  <Crown className="w-8 h-8 text-white" />
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-slate-800 mb-2">
-                プレミアムプランにアップグレード
-              </h3>
-              <p className="text-slate-600 mb-6 max-w-lg mx-auto">
-                より高精度な「Deepthink」分析など、全ての機能を利用できます。
-                プロフェッショナルな文章判定をお試しください。
-              </p>
-              <Button
-                onClick={handleUpgradeClick}
-                disabled={isRedirecting}
-                size="lg"
-                className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0 shadow-lg"
-              >
-                {isRedirecting ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    処理中...
-                  </>
-                ) : (
-                  <>
-                    <Crown className="w-4 h-4 mr-2" />
-                    プレミアムに登録する
-                  </>
-                )}
-              </Button>
-              {paymentError && (
-                <Alert className="mt-4 border-red-200 bg-red-50">
-                  <AlertDescription className="text-red-700">
-                    {paymentError}
-                  </AlertDescription>
-                </Alert>
-              )}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* タブUIセクション */}
-        <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="detector">
-              <PenSquare className="w-4 h-4 mr-2" />
-              AI判定
-            </TabsTrigger>
-            <TabsTrigger value="history">
-              <HistoryIcon className="w-4 h-4 mr-2" />
-              判定履歴
-            </TabsTrigger>
-          </TabsList>
-          <TabsContent value="detector" className="mt-6">
-            <Detector
-              session={session}
-              onDetectionSuccess={handleDetectionSuccess}
-              text={detectorText}
-              setText={setDetectorText}
-              result={detectionResult}
-              setResult={setDetectionResult}
-              isLoading={isDetecting}
-              setIsLoading={setIsDetecting}
-              error={detectionError}
-              setError={setDetectionError}
+      {loading ? (
+        <Card className="max-w-md mx-auto">
+          <CardContent className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+            <span className="ml-2 text-slate-600">読み込み中...</span>
+          </CardContent>
+        </Card>
+      ) : !session ? (
+        // 未ログイン時の認証UI
+        <Card className="max-w-md mx-auto shadow-lg border-0">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">ログイン</CardTitle>
+            <CardDescription>
+              アカウントにログインして AI 判定機能をご利用ください
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Auth
+              supabaseClient={supabase}
+              appearance={{
+                theme: ThemeSupa,
+                style: {
+                  button: {
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '500'
+                  },
+                  input: {
+                    borderRadius: '8px',
+                    fontSize: '14px'
+                  }
+                }
+              }}
+              providers={['google']}
+              localization={{
+                variables: {
+                  sign_in: {
+                    email_label: 'メールアドレス',
+                    password_label: 'パスワード',
+                    email_input_placeholder: 'your@email.com',
+                    password_input_placeholder: '********',
+                    button_label: 'サインイン',
+                    social_provider_text: '{{provider}}でサインイン',
+                    link_text: 'アカウントをお持ちですか？ サインイン',
+                  },
+                  sign_up: {
+                    email_label: 'メールアドレス',
+                    password_label: 'パスワード',
+                    email_input_placeholder: 'your@email.com',
+                    password_input_placeholder: '********',
+                    button_label: 'サインアップ',
+                    social_provider_text: '{{provider}}でサインアップ',
+                    link_text: 'アカウントがありませんか？ サインアップ',
+                  },
+                  forgotten_password: {
+                    email_label: 'メールアドレス',
+                    button_label: 'パスワードをリセット',
+                    link_text: 'パスワードをお忘れですか？',
+                  }
+                }
+              }}
             />
-          </TabsContent>
-          <TabsContent value="history" className="mt-6">
-            {historyError ? (
-              <Alert variant="destructive">
-                <AlertDescription>{historyError}</AlertDescription>
-              </Alert>
-            ) : (
-              <History
-                detections={detections}
-                onLoadMore={loadMoreHistory}
-                hasMore={hasMoreHistory}
-                isLoading={historyLoading}
+          </CardContent>
+        </Card>
+      ) : (
+        // ログイン済みの場合
+        <>
+          {/* ユーザー情報ヘッダー */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-sm">{session.user.email?.charAt(0).toUpperCase()}</span>
+              </div>
+              <div>
+                <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">{session.user.email}</p>
+                {profile && (
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge
+                      variant={profile.plan === 'premium' ? 'default' : 'secondary'}
+                      className={`${profile.plan === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0' : 'bg-slate-100 text-slate-700'}`}
+                    >
+                      {profile.plan === 'premium' ? <><Crown className="w-3 h-3 mr-1" />PREMIUM</> : 'FREE'}
+                    </Badge>
+                    {/* ✨ CHANGED: 解約予定がある場合に情報を表示 */}
+                    {profile.plan_expires_at && (
+                      <div className="flex items-center gap-1 text-xs text-yellow-600">
+                        <CalendarClock className="w-3 h-3" />
+                        <span>解約予定</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                >
+                  メニュー
+                  <ChevronsUpDown className="w-4 h-4 ml-2" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/dashboard">
+                    <LayoutGrid className="w-4 h-4 mr-2" />
+                    <span>ダッシュボード</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                  <LogOut className="w-4 h-4 mr-2" />
+                  <span>ログアウト</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* プレミアムアップグレードセクション */}
+          {profile?.plan === 'free' && (
+            <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
+              <CardContent className="p-8 text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="p-3 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full">
+                    <Crown className="w-8 h-8 text-white" />
+                  </div>
+                </div>
+                <h3 className="text-2xl font-bold text-slate-800 mb-2">
+                  プレミアムプランにアップグレード
+                </h3>
+                <p className="text-slate-600 mb-6 max-w-lg mx-auto">
+                  より高精度な「Deepthink」分析など、全ての機能を利用できます。
+                  プロフェッショナルな文章判定をお試しください。
+                </p>
+                <Button
+                  onClick={handleUpgradeClick}
+                  disabled={isRedirecting}
+                  size="lg"
+                  className="bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0 shadow-lg"
+                >
+                  {isRedirecting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      処理中...
+                    </>
+                  ) : (
+                    <>
+                      <Crown className="w-4 h-4 mr-2" />
+                      プレミアムに登録する
+                    </>
+                  )}
+                </Button>
+                {paymentError && (
+                  <Alert className="mt-4 border-red-200 bg-red-50">
+                    <AlertDescription className="text-red-700">
+                      {paymentError}
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* タブUIセクション */}
+          <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="detector">
+                <PenSquare className="w-4 h-4 mr-2" />
+                AI判定
+              </TabsTrigger>
+              <TabsTrigger value="history">
+                <HistoryIcon className="w-4 h-4 mr-2" />
+                判定履歴
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="detector" className="mt-6">
+              <Detector
+                session={session}
+                onDetectionSuccess={handleDetectionSuccess}
+                text={detectorText}
+                setText={setDetectorText}
+                result={detectionResult}
+                setResult={setDetectionResult}
+                isLoading={isDetecting}
+                setIsLoading={setIsDetecting}
+                error={detectionError}
+                setError={setDetectionError}
               />
-            )}
-          </TabsContent>
-        </Tabs>
-      </>
-    )
+            </TabsContent>
+            <TabsContent value="history" className="mt-6">
+              {historyError ? (
+                <Alert variant="destructive">
+                  <AlertDescription>{historyError}</AlertDescription>
+                </Alert>
+              ) : (
+                <History
+                  detections={detections}
+                  onLoadMore={loadMoreHistory}
+                  hasMore={hasMoreHistory}
+                  isLoading={historyLoading}
+                />
+              )}
+            </TabsContent>
+          </Tabs>
+        </>
+      )}
+    </>
   );
 }
