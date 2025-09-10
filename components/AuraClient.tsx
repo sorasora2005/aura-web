@@ -80,6 +80,9 @@ export default function AuraClient() {
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [isRedirecting, setIsRedirecting] = useState(false);
 
+  // 🆕 アカウント削除状態の管理
+  const [accountStatus, setAccountStatus] = useState<'loading' | 'active' | 'deleted'>('loading');
+
   // 履歴機能用のState
   const [detections, setDetections] = useState<Detection[]>([]);
   const [historyPage, setHistoryPage] = useState(0); // 0-indexed page
@@ -159,20 +162,67 @@ export default function AuraClient() {
     // これで、次に履歴タブを開いたときに useEffect が走り、fetchHistory(0) が実行される
   };
 
+  // 🆕 強制ログアウト関数（エラーメッセージなし）
+  const forceLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+    setProfile(null);
+    setAccountStatus('loading'); // リセット
+    // 状態をクリア
+    setDetections([]);
+    setHistoryPage(0);
+    setHasMoreHistory(true);
+    setDetectorText("");
+    setDetectionResult(null);
+    setIsDetecting(false);
+    setDetectionError(null);
+  };
+
+  // 🆕 プロファイル取得関数（エラーハンドリング強化）
+  const fetchProfile = async (session: Session) => {
+    try {
+      const { data: profileData, error } = await supabase
+        .from('profiles')
+        .select('plan, request_count, plan_expires_at')
+        .single();
+
+      if (error) {
+        console.error('Profile fetch error:', error);
+        // プロファイルが取得できない場合は削除済みアカウントとして処理
+        setAccountStatus('deleted');
+        return null;
+      }
+
+      setProfile(profileData as UserProfile);
+      setAccountStatus('active');
+      return profileData as UserProfile;
+    } catch (error) {
+      console.error('Profile fetch exception:', error);
+      setAccountStatus('deleted');
+      return null;
+    }
+  };
+
   // コンポーネントがマウントされた時に一度だけ実行
   useEffect(() => {
     // 現在のセッションとプロファイル情報を取得する非同期関数
     const getSessionAndProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
 
-      // ログインしている場合、プロフィール情報を取得
       if (session) {
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('plan, request_count, plan_expires_at')
-          .single();
-        setProfile(profileData as UserProfile);
+        // セッションがある場合、プロファイルを取得
+        const profileResult = await fetchProfile(session);
+
+        if (profileResult) {
+          // プロファイル取得成功
+          setSession(session);
+        } else {
+          // プロファイル取得失敗（削除済みアカウント）→ 強制ログアウト
+          await forceLogout();
+        }
+      } else {
+        // セッションがない場合
+        setAccountStatus('loading'); // まだ未ログイン状態として扱う
       }
 
       setLoading(false);
@@ -182,21 +232,24 @@ export default function AuraClient() {
 
     // 認証状態（ログイン、ログアウトなど）が変化したときに発火するイベントリスナー
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        // 認証状態が変わったらプロフィールも再取得
+      async (_event, session) => {
         if (session) {
-          const getProfile = async () => {
-            const { data: profileData } = await supabase
-              .from('profiles')
-              .select('plan, request_count, plan_expires_at')
-              .single();
-            setProfile(profileData as UserProfile);
-          };
-          getProfile();
+          // ログイン時：プロファイルを取得して確認
+          const profileResult = await fetchProfile(session);
+
+          if (profileResult) {
+            // プロファイル取得成功
+            setSession(session);
+          } else {
+            // プロファイル取得失敗（削除済みアカウント）→ 強制ログアウト
+            await forceLogout();
+          }
         } else {
+          // ログアウト時
+          setSession(null);
           setProfile(null);
-          // ログアウト時に履歴をクリア
+          setAccountStatus('loading');
+          // 履歴をクリア
           setDetections([]);
           setHistoryPage(0);
           setHasMoreHistory(true);
@@ -244,6 +297,11 @@ export default function AuraClient() {
       setIsRedirecting(false);
     }
   };
+
+  // 🆕 削除済みアカウントの場合の表示
+  if (!loading && accountStatus === 'deleted') {
+    return null;
+  }
 
   return (
     loading ? (
@@ -329,7 +387,7 @@ export default function AuraClient() {
                   >
                     {profile.plan === 'premium' ? <><Crown className="w-3 h-3 mr-1" />PREMIUM</> : 'FREE'}
                   </Badge>
-                  {/* ✨ CHANGED: 解約予定がある場合に情報を表示 */}
+                  {/* 解約予定がある場合に情報を表示 */}
                   {profile.plan_expires_at && (
                     <div className="flex items-center gap-1 text-xs text-yellow-600">
                       <CalendarClock className="w-3 h-3" />
