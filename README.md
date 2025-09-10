@@ -54,6 +54,9 @@ app/
   layout.tsx
   page.tsx
   dashboard/
+    syncing/
+      page.tsx
+      SyncingClient.tsx
 	  page.tsx
   payment/
     cancel/
@@ -143,6 +146,10 @@ public/
     - FastAPIの `/v1/payments/verify-session` で決済検証（JWT認証）
     - 検証失敗時は詳細なエラー表示
     - 検証中・成功・失敗でUIを切り替え（ローディング・成功・エラー）
+- **Stripeポータル連携**
+    - Stripeポータルから戻る際、バックエンドの `/sync-subscription` エンドポイントにリクエストを送信
+    - 同期成功後、ダッシュボードにリダイレクト
+    - プランのダウングレード時、解約日をバックエンドから取得し、PlanAndBilling.tsx に表示
 
 ### **AI検出機能 (`components/Detector.tsx`)**
 
@@ -183,6 +190,8 @@ public/
 - NEXT_PUBLIC_FASTAPI_ENDPOINT で指定したFastAPIサーバーに決済リクエスト
 - JWT認証でセキュアにAPI連携
 - Stripe Checkoutを利用
+- Stripeポータルからの戻り処理に `/syncing` エンドポイントを追加
+- 解約日を取得してUIに反映
 
 ### **4.3. AI検出API連携**
 
@@ -199,12 +208,12 @@ public/
     - 履歴タブを開いた時のみAPIリクエスト（パフォーマンス配慮）
     - ダッシュボードでは RecentDetections.tsx で直近5件を表示
 
-### **4.5. ダッシュボード機能（v5.0新設）**
+### **4.5. ダッシュボード機能**
 
 - `/dashboard` でアカウント・統計・プラン・履歴を一元管理
 - DashboardClient.tsx が状態管理・データ取得を担当
 - サブウィジェットで各機能を分離し、保守性・拡張性を向上
-
+- PlanAndBilling.tsx に解約日表示を追加
 ---
 
 ## **5. 依存パッケージ**
