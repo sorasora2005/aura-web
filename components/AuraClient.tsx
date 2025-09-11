@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, Loader2, LayoutGrid, LogOut, Crown, ChevronsUpDown, PenSquare, History as HistoryIcon, CalendarClock } from "lucide-react";
 import { ListDetectionsResponseSchema, Detection } from "@/lib/schemas";
 import { getErrorMessage } from "@/lib/errorUtils";
+import { ThemeToggle } from "@/components/theme-toggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -382,24 +383,25 @@ export default function AuraClient() {
         // ログイン済みの場合
         <>
           {/* ユーザー情報ヘッダー */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-white/50 backdrop-blur-sm rounded-xl border border-white/20">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 p-4 bg-card/80 dark:bg-card/60 backdrop-blur-sm rounded-xl border"> {/* 💡 bg-white -> bg-card, border-white -> border (border-borderが適用される) */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
                 <span className="text-white font-bold text-sm">{session.user.email?.charAt(0).toUpperCase()}</span>
               </div>
               <div>
-                <p className="font-medium text-slate-700 max-w-[200px] sm:max-w-xs truncate">{session.user.email}</p>
+                {/* 💡 text-slate-700 -> text-foreground */}
+                <p className="font-medium text-foreground max-w-[200px] sm:max-w-xs truncate">{session.user.email}</p>
                 {profile && (
                   <div className="flex items-center gap-2 mt-1">
                     <Badge
                       variant={profile.plan === 'premium' ? 'default' : 'secondary'}
-                      className={`${profile.plan === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0' : 'bg-slate-100 text-slate-700'}`}
+                      // 💡 FREEプランのBadgeはvariant="secondary"だけでOK。固定のclassは不要。
+                      className={`${profile.plan === 'premium' ? 'bg-gradient-to-r from-yellow-400 to-orange-500 text-white border-0' : ''}`}
                     >
                       {profile.plan === 'premium' ? <><Crown className="w-3 h-3 mr-1" />PREMIUM</> : 'FREE'}
                     </Badge>
-                    {/* ✨ CHANGED: 解約予定がある場合に情報を表示 */}
                     {profile.plan_expires_at && (
-                      <div className="flex items-center gap-1 text-xs text-yellow-600">
+                      <div className="flex items-center gap-1 text-xs text-yellow-600 dark:text-yellow-500"> {/* 💡 darkモード用の色を追加 */}
                         <CalendarClock className="w-3 h-3" />
                         <span>解約予定</span>
                       </div>
@@ -408,34 +410,38 @@ export default function AuraClient() {
                 )}
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="w-full sm:w-auto"
-                >
-                  メニュー
-                  <ChevronsUpDown className="w-4 h-4 ml-2" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard">
-                    <LayoutGrid className="w-4 h-4 mr-2" />
-                    <span>ダッシュボード</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                  <LogOut className="w-4 h-4 mr-2" />
-                  <span>ログアウト</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <ThemeToggle />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  {/* Buttonのvariant="outline"はテーマ対応済みなので変更不要 */}
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto"
+                  >
+                    メニュー
+                    <ChevronsUpDown className="w-4 h-4 ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                {/* DropdownMenuContentもshadcn/uiコンポーネントなのでテーマ対応済み */}
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>マイアカウント</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/dashboard">
+                      <LayoutGrid className="w-4 h-4 mr-2" />
+                      <span>ダッシュボード</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                    <LogOut className="w-4 h-4 mr-2" />
+                    <span>ログアウト</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-
           {/* プレミアムアップグレードセクション */}
           {profile?.plan === 'free' && (
             <Card className="border-0 bg-gradient-to-r from-blue-50 to-indigo-50 shadow-lg">
