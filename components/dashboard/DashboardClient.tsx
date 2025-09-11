@@ -137,7 +137,7 @@ export default function DashboardClient() {
         <UsageOverview stats={stats} profile={profile} />
       </div>
 
-      <AccountManagement session={session} />
+      <AccountManagement session={session} profile={profile} />
 
       <PlanAndBilling session={session} profile={profile} />
 

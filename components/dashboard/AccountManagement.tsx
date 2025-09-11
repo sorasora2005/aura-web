@@ -12,9 +12,10 @@ import type { Session } from "@supabase/supabase-js";
 
 type Props = {
   session: Session;
+  profile: { plan: 'free' | 'premium', request_count: number };
 };
 
-export default function AccountManagement({ session }: Props) {
+export default function AccountManagement({ session, profile }: Props) {
   const supabase = createClient();
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -103,8 +104,27 @@ export default function AccountManagement({ session }: Props) {
             <AlertDialogContent>
               <AlertDialogHeader>
                 <AlertDialogTitle>本当にアカウントを削除しますか？</AlertDialogTitle>
-                <AlertDialogDescription>
-                  この操作を実行すると、あなたのアカウント、プロフィール、すべての判定履歴が永久に削除されます。この操作は元に戻せません。
+                <AlertDialogDescription asChild>
+                  <div className="text-muted-foreground text-sm">
+                    {profile.plan === 'premium' ? (
+                      <div className="space-y-3">
+                        <p className="font-bold text-red-600">
+                          【プレミアムプランをご利用中のお客様へ】
+                        </p>
+                        <p>
+                          アカウントを削除すると、プレミアムサービスは<strong>即座にご利用できなくなります。</strong>
+                          あなたのアカウント、プロフィール、すべての判定履歴は永久に削除され、<strong>一切復旧できません。</strong>
+                        </p>
+                        <p>
+                          また、現在ご契約中のサブスクリプションも解約されます。この操作は本当に元に戻せません。
+                        </p>
+                      </div>
+                    ) : (
+                      <p>
+                        この操作を実行すると、あなたのアカウント、プロフィール、すべての判定履歴が永久に削除されます。この操作は元に戻せません。
+                      </p>
+                    )}
+                  </div>
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
