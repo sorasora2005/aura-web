@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"; // 追加
 import { History as HistoryIcon, Brain, User, AlertTriangle, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -77,33 +78,71 @@ export default function History({ detections, onLoadMore, hasMore, isLoading }: 
                 <DialogHeader>
                   <DialogTitle>判定結果詳細</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
-                    <span className="text-sm font-medium">判定日時</span>
-                    <span className="text-sm">{format(new Date(item.created_at), "yyyy年MM月dd日 HH:mm:ss", { locale: ja })}</span>
+                <ScrollArea className="max-h-[80vh]">
+                  <div className="space-y-4 py-4 pr-6">
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
+                      <span className="text-sm font-medium">判定日時</span>
+                      <span className="text-sm">{format(new Date(item.created_at), "yyyy年MM月dd日 HH:mm:ss", { locale: ja })}</span>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
+                      <span className="text-sm font-medium">最終判定</span>
+                      <Badge variant={item.is_ai ? "destructive" : "default"} className="text-sm">
+                        {item.is_ai ? <Brain className="w-4 h-4 mr-2" /> : <User className="w-4 h-4 mr-2" />}
+                        {item.is_ai ? "AI生成の可能性が高い" : "人間による執筆の可能性が高い"}
+                      </Badge>
+                    </div>
+                    <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
+                      <span className="text-sm font-medium">AI生成の確率</span>
+                      <span className="text-lg font-bold text-blue-600">{formatScore(item.score)}%</span>
+                    </div>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">入力テキスト全文</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <ScrollArea className="h-40 w-full rounded-md border p-4 bg-slate-50 text-sm">
+                          {item.input_text}
+                        </ScrollArea>
+                      </CardContent>
+                    </Card>
+
+                    {/* ▼▼▼ ここからが追加されたセクション ▼▼▼ */}
+                    {item.detailed_analysis && item.detailed_analysis.length > 0 && (
+                      <Card>
+                        <CardHeader>
+                          <div className="flex items-center gap-2">
+                            <Brain className="w-5 h-5 text-purple-600" />
+                            <CardTitle className="text-base">AIによる詳細分析 (プレミアム機能)</CardTitle>
+                          </div>
+                          <CardDescription>
+                            AIが特に「AIによって生成された可能性が高い」と判断した箇所です。
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <Accordion type="single" collapsible className="w-full">
+                            {item.detailed_analysis.map((analysis, index) => (
+                              <AccordionItem value={`item-${index}`} key={index}>
+                                <AccordionTrigger className="text-sm text-left hover:no-underline">
+                                  <div className="flex items-start gap-3">
+                                    <div className="mt-1">
+                                      <AlertTriangle className="w-4 h-4 text-purple-700" />
+                                    </div>
+                                    <p className="flex-1">{analysis.sentence}</p>
+                                  </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="p-4 border-l-2 border-purple-200 ml-5 pl-5 bg-slate-50 rounded-r-md">
+                                  <p className="text-sm text-slate-700">{analysis.reason}</p>
+                                </AccordionContent>
+                              </AccordionItem>
+                            ))}
+                          </Accordion>
+                        </CardContent>
+                      </Card>
+                    )}
+                    {/* ▲▲▲ ここまでが追加されたセクション ▲▲▲ */}
+
                   </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
-                    <span className="text-sm font-medium">最終判定</span>
-                    <Badge variant={item.is_ai ? "destructive" : "default"} className="text-sm">
-                      {item.is_ai ? <Brain className="w-4 h-4 mr-2" /> : <User className="w-4 h-4 mr-2" />}
-                      {item.is_ai ? "AI生成の可能性が高い" : "人間による執筆の可能性が高い"}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-slate-50 rounded-md">
-                    <span className="text-sm font-medium">AI生成の確率</span>
-                    <span className="text-lg font-bold text-blue-600">{formatScore(item.score)}%</span>
-                  </div>
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="text-base">入力テキスト全文</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <ScrollArea className="h-60 w-full rounded-md border p-4 bg-slate-50 text-sm">
-                        {item.input_text}
-                      </ScrollArea>
-                    </CardContent>
-                  </Card>
-                </div>
+                </ScrollArea>
               </DialogContent>
             </Dialog>
           ))}
