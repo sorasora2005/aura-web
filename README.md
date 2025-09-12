@@ -86,6 +86,7 @@ components/
     scroll-area.tsx
     tabs.tsx
     textarea.tsx
+    tooltip.tsx
 lib/
   supabase/
     client.ts
@@ -160,6 +161,12 @@ public/
 - テキストエリアに入力し、「判定」ボタンでAPIリクエスト
 - SupabaseのJWTをAuthorizationヘッダーに付与
 - レスポンスに応じて結果やエラーをUI表示
+- **プレミアムユーザー向け詳細分析**
+    - `detailed_analysis` フィールドを利用し、AI生成の可能性が高い文章部分をハイライト表示
+    - ShadCNのTooltipを使用して、ハイライト部分に説明を表示
+- **UI改善**
+    - 文字数が10,000文字を超えると枠が赤く光り、ボタンが無効化される
+    - 現在の文字数をリアルタイムで表示
 - ローディング時はスピナー表示
 
 ### **タブUI**
