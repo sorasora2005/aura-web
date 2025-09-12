@@ -17,8 +17,8 @@
 - **コンポーネント**
     - AuraClient.tsx: メインUI（認証・決済・AI判定・履歴タブUIを統括）
     - Detector.tsx: AI判定UI
-    - History.tsx: 判定履歴UI（v4.0で新設・大幅強化）
-    - `dashboard/`配下（v5.0新設・強化）
+    - History.tsx: 判定履歴UI
+    - `dashboard/`配下
         - DashboardClient.tsx: ダッシュボードの状態管理・データ取得
         - UsageOverview.tsx: 利用状況サマリー（統計・グラフ）
         - AccountManagement.tsx: アカウント管理（パスワード変更・削除）
@@ -75,7 +75,8 @@ components/
 	  RecentDetections.tsx
 	  UsageOverview.tsx
   ui/
-	  alert-dialog.tsx
+    accordion.tsx
+	alert-dialog.tsx
     alert.tsx
     badge.tsx
     button.tsx
@@ -175,7 +176,7 @@ public/
     - Tabs, TabsList, TabsTrigger, TabsContent（Radix UIベース）
     - 履歴タブはページネーション・ローディング・エラー表示に対応
     - 判定成功時は履歴を自動リフレッシュ
-    - v5.0: タブ切替時にURLクエリ `?tab=history` を付与するよう修正
+    - タブ切替時にURLクエリ `?tab=history` を付与するよう修正
 
 ---
 
