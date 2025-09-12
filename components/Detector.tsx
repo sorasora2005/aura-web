@@ -44,6 +44,9 @@ export default function Detector({
   setError
 }: Props) {
 
+  const MAX_CHARS = 10000;
+  const isOverLimit = text.length > MAX_CHARS;
+
   const handleSubmit = async () => {
     setIsLoading(true);
     setResult(null);
@@ -180,16 +183,17 @@ export default function Detector({
           <Textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            className="min-h-[200px] resize-none focus:ring-2 focus:ring-blue-500 border-slate-200"
+            // maxLength={MAX_CHARS}
+            className={`h-[250px] resize-none focus-visible:ring-2 border-slate-200 ${isOverLimit ? 'focus-visible:ring-red-400' : 'focus-visible:ring-blue-500'}`}
             placeholder="ここに文章をペーストしてください..."
           />
           <div className="flex justify-between items-center">
-            <p className="text-sm text-slate-500">
-              文字数: {text.length.toLocaleString()}
+            <p className={`text-sm ${isOverLimit ? 'font-bold text-red-600' : 'text-slate-500'}`}>
+              文字数: {text.length.toLocaleString()} / {MAX_CHARS.toLocaleString()}
             </p>
             <Button
               onClick={handleSubmit}
-              disabled={isLoading || !text.trim()}
+              disabled={isLoading || !text.trim() || isOverLimit}
               size="lg"
               className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
             >
