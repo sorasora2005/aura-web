@@ -1,9 +1,16 @@
 import { z } from "zod";
 
+// ◆ 1. 詳細分析の単一アイテムのスキーマを定義
+export const AnalysisItemSchema = z.object({
+  sentence: z.string(),
+  reason: z.string(),
+});
+
 // スキーマを定義してエクスポートする
 export const AiResponseSchema = z.object({
   is_ai: z.boolean(),
   score: z.number().min(0).max(1),
+  detailed_analysis: z.array(AnalysisItemSchema).nullable(),
 });
 
 // ↑のスキーマからTypeScriptの型を生成してエクスポート
@@ -20,6 +27,7 @@ export const DetectionSchema = z.object({
   score: z.number().min(0).max(1),
   is_ai: z.boolean(),
   created_at: z.string().datetime(), // APIからはISO文字列で渡される
+  detailed_analysis: z.array(AnalysisItemSchema).nullable(),
 });
 
 // 履歴アイテムの配列のスキーマ
